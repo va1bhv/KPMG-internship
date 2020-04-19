@@ -1,0 +1,46 @@
+# Imports
+import pandas as pd
+
+# Reading the data
+df = pd.read_excel('KPMG combined data.xlsx', sheet_name='data')
+
+# Grab customer Ids
+custID = df['customer id'].to_numpy()
+df.set_index('customer id', inplace=True, drop=False)
+
+# Define bins to segment age
+age_bins = [18, 30, 45, 60, 100]
+df['Age Group'] = pd.cut(df['age as of 18/04/2020'], bins=age_bins, labels=['Adult', 'Middle Aged', 'Senior', 'Very Senior'])
+
+# Get the dates only from the timestamp data type of 'Recency'
+dates = pd.DataFrame(df.loc[custID,'recency'])
+dates['recency'] = [dates.iloc[i, 0].date() for i in range(len(dates))]
+refDate = pd.to_datetime('31/12/2017').date()
+dates['recency'] = refDate - dates['recency']
+dates['recency'] = [i.days for i in dates['recency']]
+df['recency'] = dates['recency']
+
+# Define labels for division of data to get RFM scores
+labelsR = ["5","4","3","2","1"]
+labels = ["1","2","3","4","5"]
+R = pd.qcut(df['recency'], q=5,labels=labelsR)
+F = pd.qcut(df['number of records'], q=5, labels=labels)
+M = pd.qcut(df['margin'], q=5, labels=labels)
+df['R'] = R
+df['F'] = F
+df['M'] = M
+df['R'] = df['R'].astype('int64')
+df['F'] = df['F'].astype('int64')
+df['M'] = df['M'].astype('int64')
+
+# Get the RFM score with weight for recency as 100; weight for frequency as 10; and weight for monetary as 1
+df['RFM'] = 100*df['R'] + 10*df['F'] + df['M']
+
+# Get composite RFM as a summation of individual R, F and M scores
+df['RFM Composite'] = df['R'] + df['F'] + df['M']
+
+# Export the data
+dfOut = df.nlargest(1000,['RFM Composite'])
+
+
+dfOut.to_excel('data.xlsx')
